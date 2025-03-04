@@ -13,8 +13,8 @@ from langflow.field_typing.range_spec import RangeSpec
 
 
 class WatsonxComponent(LCModelComponent):
-    display_name = "Watsonx"
-    description = "Watsonx foundation models"
+    display_name = "watsonx"
+    description = "watsonx foundation models"
     beta = False
     inputs = [
         *LCModelComponent._base_inputs,
