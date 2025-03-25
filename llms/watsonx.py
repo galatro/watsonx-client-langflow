@@ -13,9 +13,12 @@ from langflow.field_typing.range_spec import RangeSpec
 
 
 class WatsonxComponent(LCModelComponent):
-    display_name = "watsonx"
-    description = "watsonx foundation models"
+    display_name = "IBM watsonx.ai"
+    description = "Generate text using IBM watsonx.ai foundation models."
     beta = False
+    
+    _default_models = ["ibm/granite-3-2b-instruct", "ibm/granite-3-8b-instruct", "ibm/granite-13b-instruct-v2"]
+
     inputs = [
         *LCModelComponent._base_inputs,
         DropdownInput(
