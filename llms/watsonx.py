@@ -6,7 +6,7 @@ from typing import Any
 
 import requests
 
-from langflow.inputs import DropdownInput, IntInput, SecretStrInput, StrInput, FloatInput, SliderInput
+from langflow.inputs import DropdownInput, IntInput, SecretStrInput, StrInput, BoolInput, SliderInput
 from langflow.field_typing.range_spec import RangeSpec
 from langflow.schema.dotdict import dotdict
 
@@ -43,14 +43,12 @@ class WatsonxComponent(LCModelComponent):
         ),
         StrInput(
             name="project_id",
-            display_name="watsonx project id",
-            advanced=False,
+            display_name="watsonx Project ID",
         ),
         SecretStrInput(
             name="api_key",
             display_name="API Key",
             info="The API Key to use for the model.",
-            advanced=False,
             required=True,
         ),
         DropdownInput(
@@ -67,67 +65,72 @@ class WatsonxComponent(LCModelComponent):
             advanced=True,
             info="The maximum number of tokens to generate.",
             range_spec=RangeSpec(min=1, max=4096),
-        ),
-        IntInput(
-            name="min_tokens",
-            display_name="Min Tokens",
-            advanced=True,
-            info="The minimum number of tokens to generate.",
-            range_spec=RangeSpec(min=0, max=2048),
-        ),
-        DropdownInput(
-            name="decoding_method",
-            display_name="Decoding method",
-            advanced=True,
-            options=["greedy", "sample"],
-            value="greedy",
-        ),
-        FloatInput(
-            name="repetition_penalty",
-            display_name="Repetition Penalty",
-            advanced=True,
-            info="Penalty for repetition in generation.",
-            range_spec=RangeSpec(min=1.0, max=2.0),
-        ),
-        IntInput(
-            name="random_seed",
-            display_name="Random Seed",
-            advanced=True,
-            info="The random seed for the model.",
-        ),
-        SliderInput(
-            name="top_p",
-            display_name="Top P",
-            advanced=True,
-            info="The cumulative probability cutoff for token selection. Lower values mean sampling from a smaller, more top-weighted nucleus.",
-            range_spec=RangeSpec(min=0, max=1),
-            field_type="float",
-        ),
-        SliderInput(
-            name="top_k",
-            display_name="Top K",
-            advanced=True,
-            info="Sample from the k most likely next tokens at each step. Lower k focuses on higher probability tokens.",
-            range_spec=RangeSpec(min=1, max=100),
-            field_type="int",
-        ),
-        SliderInput(
-            name="temperature",
-            display_name="Temperature",
-            advanced=True,
-            info="Controls randomness, higher values increase diversity.",
-            range_spec=RangeSpec(min=0, max=2),
-            field_type="float",
+            value=1000,
         ),
         StrInput(
             name="stop_sequence",
             display_name="Stop Sequence",
             advanced=True,
-            info="A sequence where the generation should stop.",
+            info="Sequence where generation should stop.",
             field_type="str",
         ),
+        SliderInput(
+            name="temperature",
+            display_name="Temperature",
+            info="Controls randomness, higher values increase diversity.",
+            value=0.1,
+            range_spec=RangeSpec(min=0, max=2, step=0.01),
+            advanced=True,
+        ),
+        SliderInput(
+            name="top_p",
+            display_name="Top P",
+            info="The cumulative probability cutoff for token selection. "
+            "Lower values mean sampling from a smaller, more top-weighted nucleus.",
+            value=0.9,
+            range_spec=RangeSpec(min=0, max=1, step=0.01),
+            advanced=True,
+        ),
+        SliderInput(
+            name="frequency_penalty",
+            display_name="Frequency Penalty",
+            info="Penalty for frequency of token usage.",
+            value=0.5,
+            range_spec=RangeSpec(min=-2.0, max=2.0, step=0.01),
+            advanced=True,
+        ),
+        SliderInput(
+            name="presence_penalty",
+            display_name="Presence Penalty",
+            info="Penalty for token presence in prior text.",
+            value=0.3,
+            range_spec=RangeSpec(min=-2.0, max=2.0, step=0.01),
+            advanced=True,
+        ),
+        IntInput(
+            name="seed",
+            display_name="Random Seed",
+            advanced=True,
+            info="The random seed for the model.",
+            value=8,
+        ),
+        BoolInput(
+            name="logprobs",
+            display_name="Log Probabilities",
+            advanced=True,
+            info="Whether to return log probabilities of the output tokens.",
+            value=True,
+        ),
+        IntInput(
+            name="top_logprobs",
+            display_name="Top Log Probabilities",
+            advanced=True,
+            info="Number of most likely tokens to return at each position.",
+            value=3,
+            range_spec=RangeSpec(min=1, max=20),
+        ),
     ]
-    
+
     @staticmethod
     def fetch_models(base_url: str) -> list[str]:
         """Fetch available models from the watsonx.ai API."""
@@ -160,11 +163,26 @@ class WatsonxComponent(LCModelComponent):
 
 def build_model(self) -> LanguageModel:
 
+        chat_params = {
+            "max_tokens": getattr(self, "max_tokens", None),
+            "temperature": getattr(self, "temperature", None),
+            "top_p": getattr(self, "top_p", None),
+            "frequency_penalty": getattr(self, "frequency_penalty", None),
+            "presence_penalty": getattr(self, "presence_penalty", None),
+            "seed": getattr(self, "seed", None),
+            "stop": [self.stop_sequence] if self.stop_sequence else [],
+            "n": 1,
+            "logprobs": getattr(self, "logprobs", True),
+            "top_logprobs": getattr(self, "top_logprobs", None),
+            "time_limit": 600000,
+            "logit_bias": {"1003": -100, "1004": -100},
+        }
+
         return ChatWatsonx(
             apikey=SecretStr(self.api_key).get_secret_value(),
             url=self.url,
             project_id=self.project_id,
             model_id=self.model_name,
-            params={},
+            params=chat_params,
             streaming=self.stream,
         )
