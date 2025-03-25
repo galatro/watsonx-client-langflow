@@ -6,6 +6,11 @@ from ibm_watsonx_ai import Credentials, APIClient
 from ibm_watsonx_ai.metanames import EmbedTextParamsMetaNames
 from pydantic.v1 import SecretStr
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class WatsonxAIEmbeddingsComponent(LCEmbeddingsModel):
     display_name = "IBM watsonx.ai Embeddings"
