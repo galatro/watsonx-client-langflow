@@ -10,6 +10,11 @@ from ibm_watsonx_ai import Credentials
 from langflow.inputs import DropdownInput, IntInput, SecretStrInput, StrInput, FloatInput, SliderInput
 from langflow.field_typing.range_spec import RangeSpec
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 
 class WatsonxComponent(LCModelComponent):
