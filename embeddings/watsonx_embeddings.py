@@ -1,6 +1,12 @@
+from typing import Any
+import requests
+
+from langchain_ibm import WatsonxEmbeddings
+
 from langflow.base.embeddings.model import LCEmbeddingsModel
 from langflow.field_typing import Embeddings
 from langflow.io import IntInput, DictInput, DropdownInput, StrInput, SecretStrInput
+from langflow.schema.dotdict import dotdict
 
 from ibm_watsonx_ai import Credentials, APIClient
 from ibm_watsonx_ai.metanames import EmbedTextParamsMetaNames
@@ -16,6 +22,12 @@ class WatsonxAIEmbeddingsComponent(LCEmbeddingsModel):
     display_name = "IBM watsonx.ai Embeddings"
     description = "Generate embeddings using watsonx.ai models."
     name = "IBMwatsonxEmbeddings"
+
+    _default_models = ["sentence-transformers/all-minilm-l12-v2",
+                       "ibm/slate-125m-english-rtrvr-v2",
+                       "ibm/slate-30m-english-rtrvr-v2",
+                       "intfloat/multilingual-e5-large"]
+
     inputs = [
         DropdownInput(
             name="url",
@@ -63,6 +75,38 @@ class WatsonxAIEmbeddingsComponent(LCEmbeddingsModel):
             value=200,
         )
     ]
+
+    @staticmethod
+    def fetch_models(base_url: str) -> list[str]:
+        """Fetch available models from the watsonx.ai API."""
+        try:
+            endpoint = f"{base_url}/ml/v1/foundation_model_specs"
+            params = {"version": "2024-09-16",
+                      "filters": "function_embedding,!lifecycle_withdrawn:and"}
+            response = requests.get(endpoint, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            models = [model["model_id"] for model in data.get("resources", [])]
+            return sorted(models)
+        except Exception:
+            logger.exception("Error fetching models")
+            return WatsonxAIEmbeddingsComponent._default_models
+
+    def update_build_config(self, build_config: dotdict, field_value: Any, field_name: str | None = None):
+        """Update model options when URL or API key changes."""
+        logger.info(
+            "Updating build config. Field name: %s, Field value: %s", field_name, field_value)
+
+        if field_name == "url" and field_value:
+            try:
+                models = self.fetch_models(base_url=build_config.url.value)
+                build_config.model_name.options = models
+                if build_config.model_name.value:
+                    build_config.model_name.value = models[0]
+                info_message = f"Updated model options: {len(models)} models found in {build_config.url.value}"
+                logger.info(info_message)
+            except Exception:
+                logger.exception("Error updating model options.")
 
     def build_embeddings(self) -> Embeddings:
         creds = Credentials(
