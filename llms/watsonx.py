@@ -1,14 +1,11 @@
 from langflow.base.models.model import LCModelComponent
 from langflow.field_typing import LanguageModel
-from langchain_ibm import WatsonxLLM
+from langchain_ibm import ChatWatsonx
 from pydantic.v1 import SecretStr
 from typing import Any
 
 import requests
 
-from ibm_watsonx_ai.foundation_models import ModelInference
-from ibm_watsonx_ai.metanames import GenTextParamsMetaNames
-from ibm_watsonx_ai import Credentials
 from langflow.inputs import DropdownInput, IntInput, SecretStrInput, StrInput, FloatInput, SliderInput
 from langflow.field_typing.range_spec import RangeSpec
 from langflow.schema.dotdict import dotdict
@@ -161,36 +158,13 @@ class WatsonxComponent(LCModelComponent):
             except Exception:
                 logger.exception("Error updating model options.")
 
-    def build_model(self) -> LanguageModel:
-        creds = Credentials(
-            api_key=SecretStr(
-                self.api_key).get_secret_value(),
+def build_model(self) -> LanguageModel:
+
+        return ChatWatsonx(
+            apikey=SecretStr(self.api_key).get_secret_value(),
             url=self.url,
-        )
-
-        generate_params = {
-            GenTextParamsMetaNames.MAX_NEW_TOKENS: self.max_tokens or 200,
-            GenTextParamsMetaNames.MIN_NEW_TOKENS: self.min_tokens or 0,
-            GenTextParamsMetaNames.DECODING_METHOD: self.decoding_method or "greedy",
-            GenTextParamsMetaNames.REPETITION_PENALTY: self.repetition_penalty or 1.0,
-            GenTextParamsMetaNames.RANDOM_SEED: self.random_seed or 33,
-            GenTextParamsMetaNames.STOP_SEQUENCES: [self.stop_sequence] if self.stop_sequence else [],
-        }
-
-        if generate_params[GenTextParamsMetaNames.DECODING_METHOD] == "sample":
-            generate_params.update(
-                {
-                    GenTextParamsMetaNames.TEMPERATURE: self.temperature or 0.5,
-                    GenTextParamsMetaNames.TOP_K: self.top_k or 1,
-                    GenTextParamsMetaNames.TOP_P: self.top_p or 0.2,
-                }
-            )
-
-        model = ModelInference(
-            model_id=self.model_name,
-            params=generate_params,
-            credentials=creds,
             project_id=self.project_id,
+            model_id=self.model_name,
+            params={},
+            streaming=self.stream,
         )
-
-        return WatsonxLLM(watsonx_model=model)
